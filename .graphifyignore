@@ -1,0 +1,14 @@
+﻿node_modules/
+.next/
+.git/
+graphify-out/
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+.vscode/
+*.log
+.env
+.env.*
+!.env.example

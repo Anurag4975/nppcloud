@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { getAuthedUser, unauthorized } from "@/lib/auth";
+import { getAuthedUser } from "@/lib/auth";
+import { unauthorized, badRequest, notFound, rpcError } from "@/lib/errors";
+import { csrfGuard } from "@/lib/csrf";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const patchSchema = z.object({
@@ -9,50 +11,51 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const csrf = csrfGuard(req);
+  if (csrf) return csrf;
   const user = await getAuthedUser();
   if (!user) return unauthorized();
 
-  const parsed = patchSchema.safeParse(await req.json());
-  if (!parsed.success) {
-    return Response.json({ error: { code: "invalid_body", message: parsed.error.message } }, { status: 400 });
-  }
+  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return badRequest("Invalid request.");
 
   const admin = supabaseAdmin();
+
+  // Move validation: target folder must exist and belong to this user.
+  if (parsed.data.parent_id) {
+    const { data: parent } = await admin
+      .from("folders")
+      .select("id")
+      .eq("id", parsed.data.parent_id)
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .single();
+    if (!parent) return badRequest("Target folder doesn't exist or isn't yours.");
+  }
+
   // Rename/move = database operation only. The B2 object key never changes.
   const { data, error } = await admin
     .from("files")
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .update({ ...parsed.data })
     .eq("id", params.id)
     .eq("user_id", user.id)
+    .eq("status", "active")
     .select()
     .single();
-
-  if (error || !data) {
-    return Response.json({ error: { code: "not_found", message: "File not found." } }, { status: 404 });
-  }
+  if (error || !data) return notFound("File not found.");
   return Response.json({ file: data });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const csrf = csrfGuard(req);
+  if (csrf) return csrf;
   const user = await getAuthedUser();
   if (!user) return unauthorized();
 
   const admin = supabaseAdmin();
-
-  const { data: file } = await admin.from("files").select("size_bytes").eq("id", params.id).eq("user_id", user.id).single();
-  if (!file) {
-    return Response.json({ error: { code: "not_found", message: "File not found." } }, { status: 404 });
-  }
-
-  // Soft delete — the B2 object is cleaned up later by a scheduled job (Phase 6),
-  // so a mistaken delete is recoverable and we never block on a slow B2 call here.
-  await admin.from("files").update({ status: "deleted" }).eq("id", params.id);
-  await admin.rpc("increment_usage", {
-    p_user_id: user.id,
-    p_stored_delta: -file.size_bytes,
-    p_uploaded_delta: 0,
-    p_downloaded_delta: 0,
-  });
-
+  // Soft delete -> trash. Quota is NOT reclaimed (trash counts toward storage,
+  // industry standard); space is freed only on permanent purge.
+  const { error } = await admin.rpc("trash_file", { p_user_id: user.id, p_file_id: params.id });
+  if (error) return rpcError(error);
   return Response.json({ ok: true });
 }

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node tests/migrations.test.mjs && node tests/consistency.test.mjs",
+    "test:migrations": "node tests/migrations.test.mjs",
+    "test:security": "node tests/consistency.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.629.0",

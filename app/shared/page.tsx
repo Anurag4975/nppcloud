@@ -2,18 +2,14 @@ import { redirect } from "next/navigation";
 import { supabaseServerClient } from "@/lib/supabase-server-client";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { AppShell } from "@/components/dashboard/AppShell";
-import DashboardClient from "./DashboardClient";
+import SharedClient from "./SharedClient";
 
-export default async function DashboardPage() {
+export default async function SharedPage() {
   const supabase = supabaseServerClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/login");
   const admin = supabaseAdmin();
   const { data: profile } = await admin.from("profiles").select("onboarded_at").eq("id", data.user.id).single();
   if (!profile?.onboarded_at) redirect("/onboarding");
-  return (
-    <AppShell>
-      <DashboardClient />
-    </AppShell>
-  );
+  return <AppShell><SharedClient /></AppShell>;
 }

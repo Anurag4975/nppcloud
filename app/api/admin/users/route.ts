@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import { internalError } from "@/lib/errors";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
@@ -21,8 +22,6 @@ export async function GET(req: NextRequest) {
 
   const { data: users, error } = await query;
 
-  if (error) {
-    return Response.json({ error: { code: "db_error", message: error.message } }, { status: 500 });
-  }
+  if (error) return internalError();
   return Response.json({ users: users ?? [] });
 }

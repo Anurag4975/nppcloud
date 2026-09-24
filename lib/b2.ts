@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PRESIGN_TTL_SECONDS = 15 * 60; // 15 minutes — keep short, per security design
@@ -52,5 +52,14 @@ export async function verifyObjectExists(objectKey: string): Promise<number | nu
     return res.ContentLength ?? 0;
   } catch {
     return null;
+  }
+}
+
+/** Permanently deletes an object (used on purge / over-quota rollback). Best-effort: never throws. */
+export async function deleteObject(objectKey: string): Promise<void> {
+  try {
+    await client().send(new DeleteObjectCommand({ Bucket: process.env.B2_BUCKET!, Key: objectKey }));
+  } catch {
+    /* orphan is reclaimed by B2 lifecycle rules; don't block the API response */
   }
 }
