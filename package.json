@@ -16,6 +16,7 @@
     "@aws-sdk/s3-request-presigner": "^3.629.0",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.4",
+    "lucide-react": "^1.48.0",
     "next": "^14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -1,3 +1,121 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 248 250 252;
+    --surface: 255 255 255;
+    --border: 226 232 240;
+    --text: 15 23 42;
+    --text-muted: 100 116 139;
+    --brand: 16 185 129;
+  }
+
+  * {
+    border-color: rgb(var(--border) / 1);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background: rgba(16, 185, 129, 0.18);
+    color: #064e3b;
+  }
+
+  /* Refined scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.28);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.45);
+    background-clip: content-box;
+    border: 2px solid transparent;
+  }
+
+  /* Focus-visible ring — consistent across interactive elements */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgba(16, 185, 129, 0.55);
+    border-radius: 6px;
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Glass surface — used sparingly on overlays only (cheap on small elements) */
+  .glass {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  }
+
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 37%, #eef2f7 63%);
+    background-size: 400px 100%;
+    @apply animate-shimmer;
+  }
+
+  /* Subtle grid texture for hero/auth panels */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  /* GPU-accelerated progress fill — animates transform, never width */
+  .progress-fill {
+    transform-origin: left center;
+    will-change: transform;
+  }
+}

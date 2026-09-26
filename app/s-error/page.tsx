@@ -1,8 +1,24 @@
+import { Link2Off, ArrowLeft } from "lucide-react";
+import Link from "next/link";
+
 export default function ShareErrorPage({ searchParams }: { searchParams: { message?: string } }) {
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6 text-center">
-      <h1 className="mb-2 text-lg font-semibold text-slate-800">Link unavailable</h1>
-      <p className="text-sm text-slate-500">{searchParams.message ?? "This link is no longer available."}</p>
+    <main className="flex min-h-screen items-center justify-center bg-ink-50 px-6">
+      <div className="w-full max-w-sm animate-slide-up text-center">
+        <span className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-ink-900 text-white shadow-pop">
+          <Link2Off className="h-7 w-7" />
+        </span>
+        <h1 className="text-xl font-bold tracking-tight text-ink-900">Link unavailable</h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink-500">
+          {searchParams.message ?? "This link is no longer available."}
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 transition-colors hover:text-brand-700"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to sign in
+        </Link>
+      </div>
     </main>
   );
 }
