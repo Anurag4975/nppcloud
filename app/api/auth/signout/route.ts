@@ -7,7 +7,7 @@ import { supabaseServerClient } from "@/lib/supabase-server-client";
 export async function POST(req: NextRequest) {
   const csrf = csrfGuard(req);
   if (csrf) return csrf;
-  const supabase = supabaseServerClient();
+  const supabase = await supabaseServerClient();
   await supabase.auth.signOut().catch(() => {});
   return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
 }
