@@ -35,14 +35,26 @@ export function Modal({ open, onClose, title, description, children, footer, cla
     return () => clearTimeout(t);
   }, [open]);
 
+  // Keep the latest onClose in a ref instead of a dependency: onClose is a
+  // fresh inline arrow function on every parent re-render (e.g. each
+  // keystroke in a form inside the modal), and having it in the deps array
+  // below re-ran the effect — and therefore re-focused the first focusable
+  // element (often the "X" close button, not the input the user was typing
+  // into) — on every one of those re-renders, stealing keystrokes.
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
-    // Focus first interactive element
+    // Focus first interactive element — only when the modal actually opens,
+    // not on every parent re-render.
     const t = setTimeout(() => {
       panelRef.current?.querySelector<HTMLElement>("input, button, [tabindex]")?.focus();
     }, 60);
@@ -51,7 +63,8 @@ export function Modal({ open, onClose, title, description, children, footer, cla
       document.body.style.overflow = "";
       clearTimeout(t);
     };
-  }, [open, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onClose intentionally excluded, see onCloseRef above
+  }, [open]);
 
   if (!mounted) return null;
 

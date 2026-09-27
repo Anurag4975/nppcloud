@@ -5,14 +5,14 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const { plan_id, days = 30 } = await req.json().catch(() => ({}));
   if (!plan_id) return badRequest("plan_id required.");
   const admin = supabaseAdmin();
-  const userId = params.id;
+  const { id: userId } = await params;
 
   const { data: plan } = await admin
     .from("plans")

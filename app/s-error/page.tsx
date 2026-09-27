@@ -1,7 +1,15 @@
 import { Link2Off, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function ShareErrorPage({ searchParams }: { searchParams: { message?: string } }) {
+// Next.js 16: page props (searchParams, params) are now async — accessing
+// them synchronously throws "used `searchParams`... must be unwrapped with
+// `await`" at runtime, the same issue that broke the [id] route handlers.
+export default async function ShareErrorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ message?: string }>;
+}) {
+  const { message } = await searchParams;
   return (
     <main className="flex min-h-screen items-center justify-center bg-ink-50 px-6">
       <div className="w-full max-w-sm animate-slide-up text-center">
@@ -10,7 +18,7 @@ export default function ShareErrorPage({ searchParams }: { searchParams: { messa
         </span>
         <h1 className="text-xl font-bold tracking-tight text-ink-900">Link unavailable</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-500">
-          {searchParams.message ?? "This link is no longer available."}
+          {message ?? "This link is no longer available."}
         </p>
         <Link
           href="/login"

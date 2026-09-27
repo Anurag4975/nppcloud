@@ -10,6 +10,22 @@ export interface UploadJob {
   progress: number;
   status: "uploading" | "done" | "error";
   error?: string;
+  /** Bytes/sec, computed from xhr.upload.onprogress deltas. Undefined until
+   *  the first progress tick after upload start. */
+  speedBps?: number;
+}
+
+/** "1.2 MB/s", "340 KB/s", etc. — same unit ladder as formatBytes. */
+export function formatSpeed(bps?: number): string {
+  if (!bps || bps <= 0) return "";
+  const units = ["B/s", "KB/s", "MB/s", "GB/s"];
+  let value = bps;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
 }
 
 interface UploadPanelProps {
@@ -102,6 +118,9 @@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) 
                       {j.status === "done" ? "Done" : j.status === "error" ? "Failed" : `${j.progress}%`}
                     </span>
                   </div>
+                  {j.status === "uploading" && j.speedBps !== undefined && (
+                    <p className="mt-0.5 text-[10px] text-ink-400">{formatSpeed(j.speedBps)}</p>
+                  )}
                   {j.error && <p className="mt-0.5 text-[10px] text-red-500">{j.error}</p>}
                 </div>
                 <button

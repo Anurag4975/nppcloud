@@ -10,11 +10,13 @@ const patchSchema = z.object({
   parent_id: z.string().uuid().nullable().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrf = csrfGuard(req);
   if (csrf) return csrf;
   const user = await getAuthedUser();
   if (!user) return unauthorized();
+
+  const { id } = await params;
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest("Invalid request.");
@@ -37,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data, error } = await admin
     .from("files")
     .update({ ...parsed.data })
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id)
     .eq("status", "active")
     .select()
@@ -46,16 +48,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return Response.json({ file: data });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrf = csrfGuard(req);
   if (csrf) return csrf;
   const user = await getAuthedUser();
   if (!user) return unauthorized();
 
+  const { id } = await params;
+
   const admin = supabaseAdmin();
   // Soft delete -> trash. Quota is NOT reclaimed (trash counts toward storage,
   // industry standard); space is freed only on permanent purge.
-  const { error } = await admin.rpc("trash_file", { p_user_id: user.id, p_file_id: params.id });
+  const { error } = await admin.rpc("trash_file", { p_user_id: user.id, p_file_id: id });
   if (error) return rpcError(error);
   return Response.json({ ok: true });
 }

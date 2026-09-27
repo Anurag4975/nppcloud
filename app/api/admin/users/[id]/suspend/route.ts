@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
@@ -13,7 +13,7 @@ export async function POST(
   if (typeof suspend !== "boolean")
     return badRequest("suspend boolean required.");
   const admin = supabaseAdmin();
-  const userId = params.id;
+  const { id: userId } = await params;
 
   const patch = suspend
     ? {

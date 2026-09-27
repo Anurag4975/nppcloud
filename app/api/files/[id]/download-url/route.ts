@@ -4,9 +4,11 @@ import { unauthorized, rpcError } from "@/lib/errors";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { getDownloadUrl } from "@/lib/b2";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getAuthedUser();
   if (!user) return unauthorized();
+
+  const { id } = await params;
 
   const admin = supabaseAdmin();
   // reserve_download() atomically checks the download allowance
@@ -14,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   // no read-then-check race, no client-trusted math.
   const { data, error } = await admin.rpc("reserve_download", {
     p_user_id: user.id,
-    p_file_id: params.id,
+    p_file_id: id,
   });
   if (error) return rpcError(error);
 

@@ -5,12 +5,12 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const admin = supabaseAdmin();
-  const userId = params.id;
+  const { id: userId } = await params;
 
   const { error } = await admin.auth.admin.signOut(userId, { scope: "global" });
   await admin

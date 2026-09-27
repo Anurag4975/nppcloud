@@ -11,16 +11,24 @@ const ERROR_MESSAGES: Record<string, string> = {
   file_not_found: "The file behind this link is no longer available.",
 };
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const admin = supabaseAdmin();
 
   // Atomic, race-condition-safe: checks revoked/expired/max_downloads/
-  // max_bytes_served and increments counters in one locked transaction.
-  // This budget is the link's own — separate from and never touching the
-  // file owner's personal upload/download quota.
-  const { data: file, error } = await admin.rpc("redeem_share_link", { p_link_id: params.id });
+  // max_bytes_served/password and increments counters in one locked
+  // transaction. This budget is the link's own — separate from and never
+  // touching the file owner's personal upload/download quota.
+  const { data: file, error } = await admin.rpc("redeem_share_link", { p_link_id: id });
 
   if (error) {
+    if (error.message === "link_password_required") {
+      // Password-gated link, no (or wrong) password on this request — send
+      // to the unlock form instead of the generic error page. That page
+      // POSTs the password to /api/s/[id]/redeem, which calls this same RPC
+      // with p_password set.
+      return NextResponse.redirect(new URL(`/s/${id}/unlock`, req.url));
+    }
     const message = ERROR_MESSAGES[error.message] ?? "This link is unavailable.";
     return NextResponse.redirect(new URL(`/s-error?message=${encodeURIComponent(message)}`, req.url));
   }
