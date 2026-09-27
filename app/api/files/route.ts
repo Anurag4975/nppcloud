@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const parentId = req.nextUrl.searchParams.get("parent_id"); // null/omitted = root
   const admin = supabaseAdmin();
 
-  let folderQuery = admin.from("folders").select("*").eq("user_id", user.id);
+  let folderQuery = admin.from("folders").select("*").eq("user_id", user.id).is("trashed_at", null);
   let fileQuery = admin.from("files").select("*").eq("user_id", user.id).eq("status", "active");
 
   folderQuery = parentId ? folderQuery.eq("parent_id", parentId) : folderQuery.is("parent_id", null);

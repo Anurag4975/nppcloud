@@ -41,7 +41,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const kind = kindOf(req);
 
   if (kind === "folder") {
-    const { error } = await admin.from("folders").delete().eq("id", id).eq("user_id", user.id).eq("status", "trashed");
+    const { error } = await admin.from("folders").delete().eq("id", id).eq("user_id", user.id).not("trashed_at", "is", null);
     if (error) return internalError();
     return Response.json({ ok: true });
   }

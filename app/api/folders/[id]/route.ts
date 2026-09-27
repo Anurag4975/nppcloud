@@ -28,7 +28,7 @@ export async function PATCH(
       .select("id")
       .eq("id", parsed.data.parent_id)
       .eq("user_id", user.id)
-      .eq("status", "active")
+      .is("trashed_at", null)
       .single();
     if (!parent)
       return badRequest("Target folder doesn't exist or isn't yours.");
@@ -38,7 +38,7 @@ export async function PATCH(
     .update({ ...parsed.data })
     .eq("id", id)
     .eq("user_id", user.id)
-    .eq("status", "active")
+    .is("trashed_at", null)
     .select()
     .single();
   if (error || !data) return notFound("Folder not found.");

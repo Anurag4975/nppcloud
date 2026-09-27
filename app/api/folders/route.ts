@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (parsed.data.parent_id) {
     const { data: parent } = await admin
       .from("folders").select("id").eq("id", parsed.data.parent_id)
-      .eq("user_id", user.id).eq("status", "active").single();
+      .eq("user_id", user.id).is("trashed_at", null).single();
     if (!parent) return badRequest("Parent folder doesn't exist or isn't yours.");
   }
 
