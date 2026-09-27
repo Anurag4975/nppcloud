@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   LogOut,
   ChevronDown,
-  Search,
   Upload,
 } from "lucide-react";
 import { ToastProvider, Progress, Avatar, DropdownMenu, cn, formatBytes } from "@/components/ui";
@@ -36,14 +35,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
-    fetch("/api/usage")
-      .then((r) => r.json())
-      .then(setUsage)
-      .catch(() => {});
+    const reloadUsage = () => {
+      fetch("/api/usage")
+        .then((r) => r.json())
+        .then(setUsage)
+        .catch(() => {});
+    };
+    reloadUsage();
+
+    const onUsage = () => reloadUsage();
+    const onVis = () => {
+      if (!document.hidden) reloadUsage();
+    };
+    window.addEventListener("nppcloud:usage-changed", onUsage);
+    document.addEventListener("visibilitychange", onVis);
+
     fetch("/api/account")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => j && setProfile(j.profile))
       .catch(() => {});
+
+    return () => {
+      window.removeEventListener("nppcloud:usage-changed", onUsage);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   const used = usage?.usage?.stored_bytes ?? 0;
@@ -101,25 +116,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-sm font-bold text-ink-900">NPP Cloud</span>
             </Link>
 
-            {/* Global search affordance */}
-            <button
-              className="ml-auto hidden h-9 w-full max-w-xs items-center gap-2.5 rounded-xl border border-ink-200 bg-ink-50/80 px-3 text-left text-xs text-ink-400 transition-all duration-150 hover:border-ink-300 hover:bg-white sm:flex"
-              onClick={() => document.getElementById("global-search-input")?.focus()}
-            >
-              <Search className="h-3.5 w-3.5" />
-              <span className="flex-1">Search files…</span>
-              <kbd className="rounded-md border border-ink-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-ink-400">
-                ⌘K
-              </kbd>
-            </button>
+            {/* The dashboard's own Toolbar already has a real, working search
+                box (id="global-search-input") wired to the current folder's
+                contents. This header used to have a second, purely
+                decorative search button whose only job was to focus that
+                same input — two search boxes for one search. Removed. */}
 
-            <Link
-              href="/dashboard"
-              className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl bg-ink-900 px-3.5 text-xs font-medium text-white shadow-soft transition-all duration-150 hover:bg-ink-800 hover:shadow-card active:scale-[0.98] sm:ml-0"
+            <button
+              type="button"
+              onClick={() => {
+                // The header has no file input of its own — the real one
+                // lives inside DashboardClient, which mounts on /dashboard.
+                // Broadcast an event it listens for instead of duplicating
+                // upload logic here or linking to a page that does nothing
+                // when you're already on it.
+                window.dispatchEvent(new CustomEvent("nppcloud:trigger-upload"));
+              }}
+              className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl bg-ink-900 px-3.5 text-xs font-medium text-white shadow-soft transition-all duration-150 hover:bg-ink-800 hover:shadow-card active:scale-[0.98]"
             >
               <Upload className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Upload</span>
-            </Link>
+            </button>
 
             {/* User menu */}
             <UserMenu profile={profile} />

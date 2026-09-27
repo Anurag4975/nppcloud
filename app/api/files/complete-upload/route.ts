@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+﻿import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getAuthedUser } from "@/lib/auth";
 import {
@@ -7,7 +7,6 @@ import {
   notFound,
   rpcError,
   apiError,
-  internalError,
 } from "@/lib/errors";
 import { csrfGuard } from "@/lib/csrf";
 import { supabaseAdmin } from "@/lib/supabase-server";
@@ -97,7 +96,6 @@ export async function POST(req: NextRequest) {
       subError,
       userId: user.id,
     });
-    return internalError();
   }
 
   const quota = (sub as any)?.plan?.quota_bytes ?? 0;
