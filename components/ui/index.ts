@@ -20,3 +20,6 @@ export { FileTypeIcon, FolderGlyph } from "./file-icon";
 export { EmptyState } from "./empty-state";
 // Re-exported helpers for convenience
 export { cn, formatBytes, timeAgo, initials } from "@/lib/utils";
+
+export { ContextMenu } from "./context-menu";
+export type { ContextMenuItem } from "./context-menu";

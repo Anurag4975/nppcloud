@@ -1,7 +1,15 @@
 "use client";
 import * as React from "react";
 import { MoreHorizontal, Download, Share2, Pencil, Trash2 } from "lucide-react";
-import { FileTypeIcon, FolderGlyph, DropdownMenu, Tooltip, cn, formatBytes, timeAgo } from "@/components/ui";
+import {
+  FileTypeIcon,
+  FolderGlyph,
+  DropdownMenu,
+  Tooltip,
+  cn,
+  formatBytes,
+  timeAgo,
+} from "@/components/ui";
 import type { FileRow, FolderRow } from "@/lib/types";
 
 /* ── List row ─────────────────────────────────────────────────────── */
@@ -14,6 +22,7 @@ interface FileListItemProps {
   onRename: (id: string, kind: "file" | "folder", name: string) => void;
   onDelete: (id: string, kind: "file" | "folder", name: string) => void;
   index: number;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const FileListItem = React.memo(function FileListItem({
@@ -25,6 +34,7 @@ export const FileListItem = React.memo(function FileListItem({
   onRename,
   onDelete,
   index,
+  onContextMenu,
 }: FileListItemProps) {
   const isFolder = kind === "folder";
   const name = item.name;
@@ -33,22 +43,52 @@ export const FileListItem = React.memo(function FileListItem({
 
   const menuItems = isFolder
     ? [
-        { label: "Rename", icon: <Pencil className="h-3.5 w-3.5" />, onClick: () => onRename(item.id, "folder", name) },
-        { label: "Move to trash", icon: <Trash2 className="h-3.5 w-3.5" />, danger: true, onClick: () => onDelete(item.id, "folder", name) },
+        {
+          label: "Rename",
+          icon: <Pencil className="h-3.5 w-3.5" />,
+          onClick: () => onRename(item.id, "folder", name),
+        },
+        {
+          label: "Move to trash",
+          icon: <Trash2 className="h-3.5 w-3.5" />,
+          danger: true,
+          onClick: () => onDelete(item.id, "folder", name),
+        },
       ]
     : [
-        { label: "Download", icon: <Download className="h-3.5 w-3.5" />, onClick: () => onDownload?.(item.id) },
-        { label: "Share link", icon: <Share2 className="h-3.5 w-3.5" />, onClick: () => onShare?.(item as FileRow) },
-        { label: "Rename", icon: <Pencil className="h-3.5 w-3.5" />, onClick: () => onRename(item.id, "file", name) },
-        { label: "Move to trash", icon: <Trash2 className="h-3.5 w-3.5" />, danger: true, onClick: () => onDelete(item.id, "file", name) },
+        {
+          label: "Download",
+          icon: <Download className="h-3.5 w-3.5" />,
+          onClick: () => onDownload?.(item.id),
+        },
+        {
+          label: "Share link",
+          icon: <Share2 className="h-3.5 w-3.5" />,
+          onClick: () => onShare?.(item as FileRow),
+        },
+        {
+          label: "Rename",
+          icon: <Pencil className="h-3.5 w-3.5" />,
+          onClick: () => onRename(item.id, "file", name),
+        },
+        {
+          label: "Move to trash",
+          icon: <Trash2 className="h-3.5 w-3.5" />,
+          danger: true,
+          onClick: () => onDelete(item.id, "file", name),
+        },
       ];
 
   return (
     <li
       className="group flex animate-slide-up items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-ink-50/80 sm:px-4"
       style={{ animationDelay: `${Math.min(index, 12) * 25}ms` }}
+      onContextMenu={onContextMenu}
     >
-      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <button
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
         {isFolder ? (
           <FolderGlyph size="sm" />
         ) : (
@@ -117,6 +157,7 @@ export const FileGridCard = React.memo(function FileGridCard({
   onRename,
   onDelete,
   index,
+  onContextMenu,
 }: FileGridCardProps) {
   const isFolder = kind === "folder";
   const name = item.name;
@@ -126,6 +167,7 @@ export const FileGridCard = React.memo(function FileGridCard({
       className="group relative flex animate-slide-up cursor-pointer flex-col items-center rounded-2xl border border-ink-200/70 bg-white p-4 text-center shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-ink-300 hover:shadow-card"
       style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
       onClick={onOpen}
+      onContextMenu={onContextMenu}
     >
       <div
         className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
@@ -138,21 +180,59 @@ export const FileGridCard = React.memo(function FileGridCard({
           items={
             isFolder
               ? [
-                  { label: "Rename", icon: <Pencil className="h-3.5 w-3.5" />, onClick: () => onRename(item.id, "folder", name) },
-                  { label: "Move to trash", icon: <Trash2 className="h-3.5 w-3.5" />, danger: true, onClick: () => onDelete(item.id, "folder", name) },
+                  {
+                    label: "Rename",
+                    icon: <Pencil className="h-3.5 w-3.5" />,
+                    onClick: () => onRename(item.id, "folder", name),
+                  },
+                  {
+                    label: "Move to trash",
+                    icon: <Trash2 className="h-3.5 w-3.5" />,
+                    danger: true,
+                    onClick: () => onDelete(item.id, "folder", name),
+                  },
                 ]
               : [
-                  { label: "Download", icon: <Download className="h-3.5 w-3.5" />, onClick: () => onDownload?.(item.id) },
-                  { label: "Share link", icon: <Share2 className="h-3.5 w-3.5" />, onClick: () => onShare?.(item as FileRow) },
-                  { label: "Rename", icon: <Pencil className="h-3.5 w-3.5" />, onClick: () => onRename(item.id, "file", name) },
-                  { label: "Move to trash", icon: <Trash2 className="h-3.5 w-3.5" />, danger: true, onClick: () => onDelete(item.id, "file", name) },
+                  {
+                    label: "Download",
+                    icon: <Download className="h-3.5 w-3.5" />,
+                    onClick: () => onDownload?.(item.id),
+                  },
+                  {
+                    label: "Share link",
+                    icon: <Share2 className="h-3.5 w-3.5" />,
+                    onClick: () => onShare?.(item as FileRow),
+                  },
+                  {
+                    label: "Rename",
+                    icon: <Pencil className="h-3.5 w-3.5" />,
+                    onClick: () => onRename(item.id, "file", name),
+                  },
+                  {
+                    label: "Move to trash",
+                    icon: <Trash2 className="h-3.5 w-3.5" />,
+                    danger: true,
+                    onClick: () => onDelete(item.id, "file", name),
+                  },
                 ]
           }
         />
       </div>
-      {isFolder ? <FolderGlyph size="lg" /> : <FileTypeIcon mime={(item as FileRow).mime_type} size="lg" />}
-      <p className={cn("mt-3 w-full truncate text-[13px] font-medium text-ink-800")}>{name}</p>
-      <p className="mt-0.5 text-[11px] text-ink-400">{isFolder ? "Folder" : formatBytes(size ?? 0)}</p>
+      {isFolder ? (
+        <FolderGlyph size="lg" />
+      ) : (
+        <FileTypeIcon mime={(item as FileRow).mime_type} size="lg" />
+      )}
+      <p
+        className={cn(
+          "mt-3 w-full truncate text-[13px] font-medium text-ink-800",
+        )}
+      >
+        {name}
+      </p>
+      <p className="mt-0.5 text-[11px] text-ink-400">
+        {isFolder ? "Folder" : formatBytes(size ?? 0)}
+      </p>
     </div>
   );
 });

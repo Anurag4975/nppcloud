@@ -52,6 +52,7 @@ export interface FolderRow {
   parent_id: string | null;
   status: FolderStatus;
   trashed_at: string | null;
+  starred?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +70,7 @@ export interface FileRow {
   created_at: string;
   updated_at: string;
   trashed_at: string | null;
+  starred?: boolean;
 }
 
 export interface UsageRow {

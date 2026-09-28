@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 const patchSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   parent_id: z.string().uuid().nullable().optional(),
+  starred: z.boolean().optional(),
 });
 
 export async function PATCH(

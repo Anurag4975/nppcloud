@@ -17,6 +17,11 @@ import {
   Trash2,
   Check,
   Copy,
+  Download,
+  Pencil,
+  FolderOpen,
+  Star,
+  Info,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import {
@@ -41,6 +46,11 @@ import {
   type UploadJob,
 } from "@/components/dashboard/UploadPanel";
 import type { FileRow, FolderRow, UsageResponse, ShareLink } from "@/lib/types";
+import { ContextMenu } from "@/components/ui";
+import {
+  DetailsPanel,
+  type DetailsItem,
+} from "@/components/dashboard/DetailsPanel";
 
 type Crumb = { id: string | null; name: string };
 
@@ -128,6 +138,15 @@ export default function DashboardClient() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
+
+  // Right-click context menu + details sidebar (Batch 1)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    item: FileRow | FolderRow;
+    kind: "file" | "folder";
+  } | null>(null);
+  const [detailsItem, setDetailsItem] = useState<DetailsItem | null>(null);
 
   // One AbortController per in-flight upload job, keyed by jobId. The cancel
   // button reaches into this map to abort the matching XHR. Entries are
@@ -386,6 +405,34 @@ export default function DashboardClient() {
     }
   }
 
+  async function toggleStar(d: DetailsItem) {
+    const current =
+      (d.item as FileRow & { starred?: boolean }).starred ?? false;
+    const endpoint =
+      d.kind === "file"
+        ? `/api/files/${d.item.id}`
+        : `/api/folders/${d.item.id}`;
+    try {
+      await api.patch(endpoint, { starred: !current });
+      toast(current ? "Removed from starred" : "Added to starred");
+      setDetailsItem((prev) =>
+        prev ? { ...prev, item: { ...prev.item, starred: !current } } : prev,
+      );
+      refresh();
+    } catch (e) {
+      toast((e as ApiError).message, "error");
+    }
+  }
+
+  function openContextMenu(
+    e: React.MouseEvent,
+    item: FileRow | FolderRow,
+    kind: "file" | "folder",
+  ) {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, item, kind });
+  }
+
   async function handleShare(file: FileRow) {
     try {
       const { link, share_url } = await api.post<{
@@ -554,6 +601,7 @@ export default function DashboardClient() {
                 item={f}
                 index={i}
                 onOpen={() => openFolder(f)}
+                onContextMenu={(e) => openContextMenu(e, f, "folder")}
                 onRename={(id, kind, name) => {
                   setRenameTarget({ id, kind, name });
                   setRenameValue(name);
@@ -570,6 +618,7 @@ export default function DashboardClient() {
                 item={f}
                 index={i + visibleFolders.length}
                 onOpen={() => handleDownload(f.id)}
+                onContextMenu={(e) => openContextMenu(e, f, "file")}
                 onDownload={handleDownload}
                 onShare={handleShare}
                 onRename={(id, kind, name) => {
@@ -591,6 +640,7 @@ export default function DashboardClient() {
                 item={f}
                 index={i}
                 onOpen={() => openFolder(f)}
+                onContextMenu={(e) => openContextMenu(e, f, "folder")}
                 onRename={(id, kind, name) => {
                   setRenameTarget({ id, kind, name });
                   setRenameValue(name);
@@ -607,6 +657,7 @@ export default function DashboardClient() {
                 item={f}
                 index={i + visibleFolders.length}
                 onOpen={() => handleDownload(f.id)}
+                onContextMenu={(e) => openContextMenu(e, f, "file")}
                 onDownload={handleDownload}
                 onShare={handleShare}
                 onRename={(id, kind, name) => {
@@ -766,6 +817,105 @@ export default function DashboardClient() {
           </p>
         </div>
       </Modal>
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: "Open",
+              icon: <FolderOpen className="h-3.5 w-3.5" />,
+              onClick: () => {
+                if (contextMenu.kind === "folder")
+                  openFolder(contextMenu.item as FolderRow);
+                else handleDownload(contextMenu.item.id);
+              },
+            },
+            ...(contextMenu.kind === "file"
+              ? [
+                  {
+                    label: "Download",
+                    icon: <Download className="h-3.5 w-3.5" />,
+                    onClick: () => handleDownload(contextMenu.item.id),
+                  },
+                  {
+                    label: "Share link",
+                    icon: <Link2 className="h-3.5 w-3.5" />,
+                    onClick: () => handleShare(contextMenu.item as FileRow),
+                  },
+                ]
+              : []),
+            {
+              label: "Rename",
+              icon: <Pencil className="h-3.5 w-3.5" />,
+              onClick: () => {
+                setRenameTarget({
+                  id: contextMenu.item.id,
+                  kind: contextMenu.kind,
+                  name: contextMenu.item.name,
+                });
+                setRenameValue(contextMenu.item.name);
+              },
+            },
+            {
+              label: (contextMenu.item as { starred?: boolean }).starred
+                ? "Remove star"
+                : "Add star",
+              icon: <Star className="h-3.5 w-3.5" />,
+              onClick: () =>
+                toggleStar({
+                  kind: contextMenu.kind,
+                  item: contextMenu.item,
+                }),
+            },
+            {
+              label: "Details",
+              icon: <Info className="h-3.5 w-3.5" />,
+              onClick: () =>
+                setDetailsItem({
+                  kind: contextMenu.kind,
+                  item: contextMenu.item,
+                }),
+            },
+            {
+              label: "Move to trash",
+              icon: <Trash2 className="h-3.5 w-3.5" />,
+              danger: true,
+              onClick: () =>
+                setDeleteTarget({
+                  id: contextMenu.item.id,
+                  kind: contextMenu.kind,
+                  name: contextMenu.item.name,
+                }),
+            },
+          ]}
+        />
+      )}
+
+      {/* Details sidebar */}
+      {detailsItem && (
+        <DetailsPanel
+          details={detailsItem}
+          location={path.map((c) => c.name).join(" / ")}
+          shareCount={sharedCount}
+          onClose={() => setDetailsItem(null)}
+          onDownload={handleDownload}
+          onShare={handleShare}
+          onRename={(id, kind, name) => {
+            setRenameTarget({ id, kind, name });
+            setRenameValue(name);
+            setDetailsItem(null);
+          }}
+          onDelete={(id, kind, name) => {
+            setDeleteTarget({ id, kind, name });
+            setDetailsItem(null);
+          }}
+          onToggleStar={toggleStar}
+        />
+      )}
     </div>
   );
 }
