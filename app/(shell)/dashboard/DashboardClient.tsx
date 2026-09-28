@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import {
   useCallback,
   useDeferredValue,
@@ -22,6 +22,7 @@ import {
   FolderOpen,
   Star,
   Info,
+  ArrowRightLeft,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import {
@@ -51,6 +52,7 @@ import {
   DetailsPanel,
   type DetailsItem,
 } from "@/components/dashboard/DetailsPanel";
+import { MoveToPicker } from "@/components/dashboard/MoveToPicker";
 
 type Crumb = { id: string | null; name: string };
 
@@ -122,6 +124,7 @@ export default function DashboardClient() {
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const showStarred = searchParams.get("starred") === "1";
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [files, setFiles] = useState<FileRow[]>([]);
   const [sharedCount, setSharedCount] = useState(0);
@@ -147,6 +150,11 @@ export default function DashboardClient() {
     kind: "file" | "folder";
   } | null>(null);
   const [detailsItem, setDetailsItem] = useState<DetailsItem | null>(null);
+  const [moveTarget, setMoveTarget] = useState<{
+    kind: "file" | "folder";
+    id: string;
+    name: string;
+  } | null>(null);
 
   // One AbortController per in-flight upload job, keyed by jobId. The cancel
   // button reaches into this map to abort the matching XHR. Entries are
@@ -179,7 +187,11 @@ export default function DashboardClient() {
   const currentFolderId = path[path.length - 1].id;
 
   const refresh = useCallback(async () => {
-    const qs = currentFolderId ? `?parent_id=${currentFolderId}` : "";
+    const qs = showStarred
+      ? "?starred=1"
+      : currentFolderId
+        ? `?parent_id=${currentFolderId}`
+        : "";
     try {
       const [list, u, shares] = await Promise.all([
         api.get<{ folders: FolderRow[]; files: FileRow[] }>(`/api/files${qs}`),
@@ -195,7 +207,7 @@ export default function DashboardClient() {
     } finally {
       setLoading(false);
     }
-  }, [currentFolderId]);
+  }, [currentFolderId, showStarred]);
 
   useEffect(() => {
     setLoading(true);
@@ -432,7 +444,31 @@ export default function DashboardClient() {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, item, kind });
   }
+  async function handleMove(parentId: string | null) {
+    if (!moveTarget) return;
+    try {
+      await api.post("/api/move", {
+        kind: moveTarget.kind,
+        id: moveTarget.id,
+        parent_id: parentId,
+      });
+      toast("Moved");
+      refresh();
+    } catch (e) {
+      toast((e as ApiError).message, "error");
+    }
+  }
 
+  async function handleDuplicate(file: FileRow) {
+    try {
+      await api.post(`/api/files/${file.id}/copy`, {});
+      toast("Duplicated");
+      refresh();
+      window.dispatchEvent(new CustomEvent("nppcloud:usage-changed"));
+    } catch (e) {
+      toast((e as ApiError).message, "error");
+    }
+  }
   async function handleShare(file: FileRow) {
     try {
       const { link, share_url } = await api.post<{
@@ -481,33 +517,40 @@ export default function DashboardClient() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       {/* Breadcrumbs */}
-      <nav className="flex flex-wrap items-center gap-1 text-sm">
-        {path.length > 1 && (
-          <button
-            onClick={goUp}
-            aria-label="Up one level"
-            className="mr-1 flex h-7 w-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-ink-100 hover:text-ink-800"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-        )}
-        {path.map((c, i) => (
-          <span key={i} className="flex items-center gap-1">
-            {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-ink-300" />}
+      {/* Breadcrumbs or Starred header */}
+      {showStarred ? (
+        <h1 className="flex items-center gap-2 text-lg font-bold text-ink-900">
+          <Star className="h-5 w-5 fill-amber-400 text-amber-400" /> Starred
+        </h1>
+      ) : (
+        <nav className="flex flex-wrap items-center gap-1 text-sm">
+          {path.length > 1 && (
             <button
-              onClick={() => jumpTo(i)}
-              className={cn(
-                "rounded-md px-1.5 py-0.5 transition-colors duration-150",
-                i === path.length - 1
-                  ? "font-semibold text-ink-900"
-                  : "text-ink-500 hover:bg-ink-100 hover:text-ink-800",
-              )}
+              onClick={goUp}
+              aria-label="Up one level"
+              className="mr-1 flex h-7 w-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-ink-100 hover:text-ink-800"
             >
-              {c.name}
+              <ChevronLeft className="h-4 w-4" />
             </button>
-          </span>
-        ))}
-      </nav>
+          )}
+          {path.map((c, i) => (
+            <span key={i} className="flex items-center gap-1">
+              {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-ink-300" />}
+              <button
+                onClick={() => jumpTo(i)}
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 transition-colors duration-150",
+                  i === path.length - 1
+                    ? "font-semibold text-ink-900"
+                    : "text-ink-500 hover:bg-ink-100 hover:text-ink-800",
+                )}
+              >
+                {c.name}
+              </button>
+            </span>
+          ))}
+        </nav>
+      )}
 
       {/* Stats */}
       <StatCards
@@ -526,7 +569,7 @@ export default function DashboardClient() {
         onViewChange={setView}
         sortKey={sortKey}
         onSortChange={setSortKey}
-        onNewFolder={() => setNewFolderOpen(true)}
+        onNewFolder={showStarred ? undefined : () => setNewFolderOpen(true)}
         onUpload={() => fileInputRef.current?.click()}
       />
       <input
@@ -602,6 +645,7 @@ export default function DashboardClient() {
                 index={i}
                 onOpen={() => openFolder(f)}
                 onContextMenu={(e) => openContextMenu(e, f, "folder")}
+                onMove={(id, kind, name) => setMoveTarget({ id, kind, name })}
                 onRename={(id, kind, name) => {
                   setRenameTarget({ id, kind, name });
                   setRenameValue(name);
@@ -619,6 +663,8 @@ export default function DashboardClient() {
                 index={i + visibleFolders.length}
                 onOpen={() => handleDownload(f.id)}
                 onContextMenu={(e) => openContextMenu(e, f, "file")}
+                onMove={(id, kind, name) => setMoveTarget({ id, kind, name })}
+                onDuplicate={handleDuplicate}
                 onDownload={handleDownload}
                 onShare={handleShare}
                 onRename={(id, kind, name) => {
@@ -641,6 +687,7 @@ export default function DashboardClient() {
                 index={i}
                 onOpen={() => openFolder(f)}
                 onContextMenu={(e) => openContextMenu(e, f, "folder")}
+                onMove={(id, kind, name) => setMoveTarget({ id, kind, name })}
                 onRename={(id, kind, name) => {
                   setRenameTarget({ id, kind, name });
                   setRenameValue(name);
@@ -658,6 +705,8 @@ export default function DashboardClient() {
                 index={i + visibleFolders.length}
                 onOpen={() => handleDownload(f.id)}
                 onContextMenu={(e) => openContextMenu(e, f, "file")}
+                onMove={(id, kind, name) => setMoveTarget({ id, kind, name })}
+                onDuplicate={handleDuplicate}
                 onDownload={handleDownload}
                 onShare={handleShare}
                 onRename={(id, kind, name) => {
@@ -861,6 +910,25 @@ export default function DashboardClient() {
               },
             },
             {
+              label: "Move to…",
+              icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
+              onClick: () =>
+                setMoveTarget({
+                  kind: contextMenu.kind,
+                  id: contextMenu.item.id,
+                  name: contextMenu.item.name,
+                }),
+            },
+            ...(contextMenu.kind === "file"
+              ? [
+                  {
+                    label: "Duplicate",
+                    icon: <Copy className="h-3.5 w-3.5" />,
+                    onClick: () => handleDuplicate(contextMenu.item as FileRow),
+                  },
+                ]
+              : []),
+            {
               label: (contextMenu.item as { starred?: boolean }).starred
                 ? "Remove star"
                 : "Add star",
@@ -895,6 +963,14 @@ export default function DashboardClient() {
         />
       )}
 
+      {/* Move to… picker */}
+      <MoveToPicker
+        open={!!moveTarget}
+        sourceFolderId={moveTarget?.kind === "folder" ? moveTarget.id : null}
+        sourceName={moveTarget?.name ?? ""}
+        onClose={() => setMoveTarget(null)}
+        onMove={handleMove}
+      />
       {/* Details sidebar */}
       {detailsItem && (
         <DetailsPanel

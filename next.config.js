@@ -26,15 +26,6 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
-
-  // TEMPORARY: unblock local dev while pre-existing TS errors in
-  // app/admin/* and app/api/admin/* are being fixed. Revert before shipping.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 };
 
 module.exports = nextConfig;

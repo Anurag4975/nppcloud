@@ -1,5 +1,13 @@
 "use client";
-import { Search, LayoutGrid, List, ChevronDown, FolderPlus, Upload, ArrowUpDown } from "lucide-react";
+import {
+  Search,
+  LayoutGrid,
+  List,
+  ChevronDown,
+  FolderPlus,
+  Upload,
+  ArrowUpDown,
+} from "lucide-react";
 import { Input, DropdownMenu, Tooltip, cn } from "@/components/ui";
 
 export type SortKey = "name" | "size" | "created_at";
@@ -18,10 +26,10 @@ interface ToolbarProps {
   onViewChange: (v: ViewMode) => void;
   sortKey: SortKey;
   onSortChange: (k: SortKey) => void;
-  onNewFolder: () => void;
+  /** Omit to hide the "New folder" button (e.g. in the Starred view). */
+  onNewFolder?: () => void;
   onUpload: () => void;
 }
-
 export function Toolbar({
   search,
   onSearch,
@@ -72,7 +80,9 @@ export function Toolbar({
               aria-label="List view"
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150",
-                view === "list" ? "bg-ink-900 text-white shadow-soft" : "text-ink-400 hover:text-ink-700"
+                view === "list"
+                  ? "bg-ink-900 text-white shadow-soft"
+                  : "text-ink-400 hover:text-ink-700",
               )}
             >
               <List className="h-4 w-4" />
@@ -84,7 +94,9 @@ export function Toolbar({
               aria-label="Grid view"
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150",
-                view === "grid" ? "bg-ink-900 text-white shadow-soft" : "text-ink-400 hover:text-ink-700"
+                view === "grid"
+                  ? "bg-ink-900 text-white shadow-soft"
+                  : "text-ink-400 hover:text-ink-700",
               )}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -92,13 +104,15 @@ export function Toolbar({
           </Tooltip>
         </div>
 
-        <button
-          onClick={onNewFolder}
-          className="flex h-9 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 shadow-soft transition-all duration-150 hover:border-ink-300 hover:bg-ink-50 active:scale-[0.98]"
-        >
-          <FolderPlus className="h-3.5 w-3.5 text-ink-500" />
-          <span className="hidden sm:inline">New folder</span>
-        </button>
+        {onNewFolder && (
+          <button
+            onClick={onNewFolder}
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 text-xs font-medium text-ink-700 shadow-soft transition-all duration-150 hover:border-ink-300 hover:bg-ink-50 active:scale-[0.98]"
+          >
+            <FolderPlus className="h-3.5 w-3.5 text-ink-500" />
+            <span className="hidden sm:inline">New folder</span>
+          </button>
+        )}
 
         <button
           onClick={onUpload}

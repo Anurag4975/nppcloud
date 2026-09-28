@@ -1,6 +1,6 @@
 ﻿"use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Cloud,
@@ -12,16 +12,33 @@ import {
   LogOut,
   ChevronDown,
   Upload,
+  Star,
 } from "lucide-react";
-import { ToastProvider, Progress, Avatar, DropdownMenu, cn, formatBytes } from "@/components/ui";
+import {
+  ToastProvider,
+  Progress,
+  Avatar,
+  DropdownMenu,
+  cn,
+  formatBytes,
+} from "@/components/ui";
 import type { UsageResponse } from "@/lib/types";
 
 const NAV = [
   { href: "/dashboard", label: "My Files", icon: Home },
+  { href: "/dashboard?starred=1", label: "Starred", icon: Star },
   { href: "/shared", label: "Shared", icon: Share2 },
   { href: "/trash", label: "Trash", icon: Trash2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+// Shared active-match so My Files and Starred don't both light up.
+function isNavActive(href: string, pathname: string, isStarred: boolean) {
+  if (href === "/dashboard?starred=1")
+    return pathname === "/dashboard" && isStarred;
+  if (href === "/dashboard") return pathname === "/dashboard" && !isStarred;
+  return pathname === href || pathname.startsWith(href + "/");
+}
 
 interface Profile {
   name: string | null;
@@ -31,6 +48,8 @@ interface Profile {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isStarred = searchParams.get("starred") === "1";
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -71,14 +90,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* ── Desktop sidebar (dark) ─────────────────────────────── */}
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-ink-950 lg:flex">
           <div className="flex flex-1 flex-col px-4 py-5">
-            <Link href="/dashboard" className="group mb-7 flex items-center gap-2.5 px-2">
+            <Link
+              href="/dashboard"
+              className="group mb-7 flex items-center gap-2.5 px-2"
+            >
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow transition-transform duration-200 group-hover:scale-105">
                 <Cloud className="h-5 w-5 text-white" strokeWidth={2.2} />
               </span>
-              <span className="text-[15px] font-bold tracking-tight text-white">NPP Cloud</span>
+              <span className="text-[15px] font-bold tracking-tight text-white">
+                NPP Cloud
+              </span>
             </Link>
 
-            <SidebarNav pathname={pathname} isAdmin={profile?.role === "admin"} />
+            <SidebarNav
+              pathname={pathname}
+              isAdmin={profile?.role === "admin"}
+              isStarred={isStarred}
+            />
 
             {/* Usage card */}
             <div className="mt-auto rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-sm">
@@ -96,8 +124,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 barClassName="bg-gradient-to-r from-brand-400 to-brand-500"
               />
               <p className="mt-2.5 text-[11px] leading-relaxed text-ink-400">
-                <span className="font-medium text-ink-200">{formatBytes(used)}</span> of{" "}
-                {formatBytes(total)} used
+                <span className="font-medium text-ink-200">
+                  {formatBytes(used)}
+                </span>{" "}
+                of {formatBytes(total)} used
                 <br />
                 {usage?.plan?.name ?? "Free"} plan
               </p>
@@ -109,7 +139,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
           {/* Top bar */}
           <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-ink-200/70 bg-white/80 px-4 backdrop-blur-md sm:px-6">
-            <Link href="/dashboard" className="flex items-center gap-2 lg:hidden">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 lg:hidden"
+            >
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600">
                 <Cloud className="h-4 w-4 text-white" />
               </span>
@@ -130,7 +163,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 // Broadcast an event it listens for instead of duplicating
                 // upload logic here or linking to a page that does nothing
                 // when you're already on it.
-                window.dispatchEvent(new CustomEvent("nppcloud:trigger-upload"));
+                window.dispatchEvent(
+                  new CustomEvent("nppcloud:trigger-upload"),
+                );
               }}
               className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl bg-ink-900 px-3.5 text-xs font-medium text-white shadow-soft transition-all duration-150 hover:bg-ink-800 hover:shadow-card active:scale-[0.98]"
             >
@@ -143,15 +178,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* Page content — bottom padding for mobile nav */}
-          <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8">{children}</main>
+          <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8">
+            {children}
+          </main>
 
           {/* Mobile bottom nav */}
-          <MobileNav pathname={pathname} />
+          <MobileNav pathname={pathname} isStarred={isStarred} />
         </div>
       </div>
 
       {/* Hidden signout form — submitted by menu items */}
-      <form id="signout-form" action="/api/auth/signout" method="POST" className="hidden">
+      <form
+        id="signout-form"
+        action="/api/auth/signout"
+        method="POST"
+        className="hidden"
+      >
         <button type="submit">sign out</button>
       </form>
     </ToastProvider>
@@ -159,12 +201,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 /* ── Sidebar nav with sliding active indicator ─────────────────────── */
-function SidebarNav({ pathname, isAdmin }: { pathname: string; isAdmin: boolean }) {
+function SidebarNav({
+  pathname,
+  isAdmin,
+  isStarred,
+}: {
+  pathname: string;
+  isAdmin: boolean;
+  isStarred: boolean;
+}) {
   const items = isAdmin
     ? [...NAV, { href: "/admin", label: "Admin", icon: ShieldCheck }]
     : NAV;
-  const activeIndex = items.findIndex(
-    (n) => pathname === n.href || (n.href === "/dashboard" && pathname.startsWith("/dashboard"))
+  const activeIndex = items.findIndex((n) =>
+    isNavActive(n.href, pathname, isStarred),
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState({ top: 0, height: 0 });
@@ -182,11 +232,14 @@ function SidebarNav({ pathname, isAdmin }: { pathname: string; isAdmin: boolean 
       <span
         aria-hidden
         className="absolute left-0 right-0 rounded-xl bg-white/[0.08] ring-1 ring-inset ring-white/10 transition-all duration-300 ease-out-expo"
-        style={{ top: pill.top, height: pill.height, transitionProperty: "top, height" }}
+        style={{
+          top: pill.top,
+          height: pill.height,
+          transitionProperty: "top, height",
+        }}
       />
       {items.map((n) => {
-        const active =
-          pathname === n.href || (n.href === "/dashboard" && pathname.startsWith("/dashboard"));
+        const active = isNavActive(n.href, pathname, isStarred);
         const Icon = n.icon;
         return (
           <Link
@@ -194,10 +247,13 @@ function SidebarNav({ pathname, isAdmin }: { pathname: string; isAdmin: boolean 
             href={n.href}
             className={cn(
               "relative z-10 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors duration-150",
-              active ? "text-white" : "text-ink-400 hover:text-ink-200"
+              active ? "text-white" : "text-ink-400 hover:text-ink-200",
             )}
           >
-            <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.2 : 1.8} />
+            <Icon
+              className="h-[18px] w-[18px]"
+              strokeWidth={active ? 2.2 : 1.8}
+            />
             {n.label}
           </Link>
         );
@@ -216,7 +272,7 @@ function UserMenu({ profile }: { profile: Profile | null }) {
         className={cn(
           "flex items-center gap-2 rounded-xl p-1 pr-2 transition-all duration-150",
           "hover:bg-ink-100 active:scale-[0.98]",
-          open && "bg-ink-100"
+          open && "bg-ink-100",
         )}
         aria-label="Account menu"
       >
@@ -224,7 +280,7 @@ function UserMenu({ profile }: { profile: Profile | null }) {
         <ChevronDown
           className={cn(
             "hidden h-3.5 w-3.5 text-ink-400 transition-transform duration-200 sm:block",
-            open && "rotate-180"
+            open && "rotate-180",
           )}
         />
       </button>
@@ -249,7 +305,11 @@ function UserMenu({ profile }: { profile: Profile | null }) {
               <button
                 onClick={() => {
                   setOpen(false);
-                  (document.getElementById("signout-form") as HTMLFormElement | null)?.requestSubmit();
+                  (
+                    document.getElementById(
+                      "signout-form",
+                    ) as HTMLFormElement | null
+                  )?.requestSubmit();
                 }}
                 className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-red-600 transition-colors hover:bg-red-50"
               >
@@ -264,12 +324,17 @@ function UserMenu({ profile }: { profile: Profile | null }) {
 }
 
 /* ── Mobile bottom navigation ──────────────────────────────────────── */
-function MobileNav({ pathname }: { pathname: string }) {
+function MobileNav({
+  pathname,
+  isStarred,
+}: {
+  pathname: string;
+  isStarred: boolean;
+}) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-ink-200/80 bg-white/90 px-2 py-1.5 backdrop-blur-md lg:hidden">
       {NAV.map((n) => {
-        const active =
-          pathname === n.href || (n.href === "/dashboard" && pathname.startsWith("/dashboard"));
+        const active = isNavActive(n.href, pathname, isStarred);
         const Icon = n.icon;
         return (
           <Link
@@ -277,7 +342,7 @@ function MobileNav({ pathname }: { pathname: string }) {
             href={n.href}
             className={cn(
               "relative flex flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[10px] font-medium transition-colors duration-150",
-              active ? "text-brand-600" : "text-ink-400"
+              active ? "text-brand-600" : "text-ink-400",
             )}
           >
             <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.8} />
