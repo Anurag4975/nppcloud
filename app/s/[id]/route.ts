@@ -11,7 +11,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   file_not_found: "The file behind this link is no longer available.",
 };
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id } = await params;
   const admin = supabaseAdmin();
 
@@ -19,7 +22,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // max_bytes_served/password and increments counters in one locked
   // transaction. This budget is the link's own — separate from and never
   // touching the file owner's personal upload/download quota.
-  const { data: file, error } = await admin.rpc("redeem_share_link", { p_link_id: id });
+  const { data: file, error } = await admin.rpc("redeem_share_link", {
+    p_link_id: id,
+  });
 
   if (error) {
     if (error.message === "link_password_required") {
@@ -29,10 +34,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // with p_password set.
       return NextResponse.redirect(new URL(`/s/${id}/unlock`, req.url));
     }
-    const message = ERROR_MESSAGES[error.message] ?? "This link is unavailable.";
-    return NextResponse.redirect(new URL(`/s-error?message=${encodeURIComponent(message)}`, req.url));
+    const message =
+      ERROR_MESSAGES[error.message] ?? "This link is unavailable.";
+    return NextResponse.redirect(
+      new URL(`/s-error?message=${encodeURIComponent(message)}`, req.url),
+    );
   }
 
-  const url = await getDownloadUrl(file.object_key, file.name);
+  // redeem_share_link is RETURNS TABLE(...), so PostgREST hands back an
+  // array of rows even for a single-row result. Unwrap before reading
+  // fields, otherwise file.object_key is undefined and B2 throws
+  // "No value provided for input HTTP label: Key".
+  const row = Array.isArray(file) ? file[0] : file;
+  if (!row) {
+    const message = ERROR_MESSAGES.file_not_found;
+    return NextResponse.redirect(
+      new URL(`/s-error?message=${encodeURIComponent(message)}`, req.url),
+    );
+  }
+
+  const url = await getDownloadUrl(row.object_key, row.name);
   return NextResponse.redirect(url);
 }

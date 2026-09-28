@@ -20,7 +20,11 @@ export default function TrashClient() {
   const [files, setFiles] = useState<FileRow[]>([]);
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [purgeTarget, setPurgeTarget] = useState<{ id: string; kind: "file" | "folder"; name: string } | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<{
+    id: string;
+    kind: "file" | "folder";
+    name: string;
+  } | null>(null);
 
   const refresh = () =>
     api
@@ -53,6 +57,7 @@ export default function TrashClient() {
       toast("Permanently deleted");
       setPurgeTarget(null);
       refresh();
+      window.dispatchEvent(new CustomEvent("nppcloud:usage-changed"));
     } catch (e) {
       toast((e as ApiError).message, "error");
     }
@@ -65,7 +70,8 @@ export default function TrashClient() {
       <div className="mb-5">
         <h1 className="text-xl font-bold tracking-tight text-ink-900">Trash</h1>
         <p className="mt-0.5 text-xs text-ink-500">
-          Items in trash count toward your storage. Purge permanently to free space.
+          Items in trash count toward your storage. Purge permanently to free
+          space.
         </p>
       </div>
 
@@ -76,7 +82,11 @@ export default function TrashClient() {
           ))}
         </div>
       ) : empty ? (
-        <EmptyState icon={<Trash2 className="h-6 w-6" />} title="Trash is empty" subtitle="Deleted files and folders will appear here." />
+        <EmptyState
+          icon={<Trash2 className="h-6 w-6" />}
+          title="Trash is empty"
+          subtitle="Deleted files and folders will appear here."
+        />
       ) : (
         <ul className="divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-soft">
           {folders.map((f, i) => (
@@ -87,18 +97,28 @@ export default function TrashClient() {
             >
               <FolderGlyph size="sm" className="opacity-60" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-ink-700">{f.name}</p>
-                <p className="text-[11px] text-ink-400">Folder · trashed {timeAgo(f.trashed_at)}</p>
+                <p className="truncate text-[13px] font-medium text-ink-700">
+                  {f.name}
+                </p>
+                <p className="text-[11px] text-ink-400">
+                  Folder · trashed {timeAgo(f.trashed_at)}
+                </p>
               </div>
               <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => restore(f.id, "folder")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => restore(f.id, "folder")}
+                >
                   <RotateCcw className="h-3.5 w-3.5" /> Restore
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                  onClick={() => setPurgeTarget({ id: f.id, kind: "folder", name: f.name })}
+                  onClick={() =>
+                    setPurgeTarget({ id: f.id, kind: "folder", name: f.name })
+                  }
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Delete
                 </Button>
@@ -111,23 +131,37 @@ export default function TrashClient() {
               className="flex animate-slide-up items-center gap-3 px-3 py-3 transition-colors hover:bg-ink-50/80 sm:px-4"
               style={{ animationDelay: `${(i + folders.length) * 30}ms` }}
             >
-              <FileTypeIcon mime={f.mime_type} size="sm" className="opacity-60" />
+              <FileTypeIcon
+                mime={f.mime_type}
+                size="sm"
+                className="opacity-60"
+              />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-ink-700">{f.name}</p>
+                <p className="truncate text-[13px] font-medium text-ink-700">
+                  {f.name}
+                </p>
                 <p className="text-[11px] text-ink-400">
                   {formatBytes(f.size_bytes)} · trashed {timeAgo(f.trashed_at)}
                 </p>
               </div>
-              <span className="hidden text-[11px] text-ink-400 sm:block">{formatBytes(f.size_bytes)}</span>
+              <span className="hidden text-[11px] text-ink-400 sm:block">
+                {formatBytes(f.size_bytes)}
+              </span>
               <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => restore(f.id, "file")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => restore(f.id, "file")}
+                >
                   <RotateCcw className="h-3.5 w-3.5" /> Restore
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                  onClick={() => setPurgeTarget({ id: f.id, kind: "file", name: f.name })}
+                  onClick={() =>
+                    setPurgeTarget({ id: f.id, kind: "file", name: f.name })
+                  }
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Delete
                 </Button>
@@ -156,8 +190,8 @@ export default function TrashClient() {
         <div className="flex items-start gap-3 rounded-xl bg-red-50 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
           <p className="text-sm text-red-800">
-            <strong className="font-semibold">{purgeTarget?.name}</strong> will be permanently
-            deleted. This cannot be undone.
+            <strong className="font-semibold">{purgeTarget?.name}</strong> will
+            be permanently deleted. This cannot be undone.
           </p>
         </div>
       </Modal>

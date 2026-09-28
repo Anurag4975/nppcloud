@@ -48,8 +48,15 @@ function putWithProgress(
   url: string,
   file: File,
   onProgress: (pct: number, speedBps: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    // If the caller already aborted before we even started, bail out
+    // immediately so we don't fire a doomed request.
+    if (signal?.aborted) {
+      reject(new Error("Upload cancelled"));
+      return;
+    }
     const xhr = new XMLHttpRequest();
     // UploadJob previously had no speed field: onprogress only tracked
     // percent, not bytes/time. Track loaded-bytes + timestamp deltas here so
@@ -70,6 +77,12 @@ function putWithProgress(
         ? resolve()
         : reject(new Error(`Upload failed (${xhr.status})`));
     xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.onabort = () => reject(new Error("Upload cancelled"));
+    // If signal aborts, kill the in-flight XHR. The onabort handler above
+    // rejects the promise. Clean up the listener once the request settles so
+    // we don't leak it on the controller.
+    const onAbort = () => xhr.abort();
+    signal?.addEventListener("abort", onAbort);
     xhr.open("PUT", url);
     xhr.setRequestHeader(
       "Content-Type",
@@ -115,6 +128,11 @@ export default function DashboardClient() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
+
+  // One AbortController per in-flight upload job, keyed by jobId. The cancel
+  // button reaches into this map to abort the matching XHR. Entries are
+  // removed in the upload's finally block.
+  const controllersRef = useRef<Map<string, AbortController>>(new Map());
 
   // Modals
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -248,11 +266,17 @@ export default function DashboardClient() {
     }
   }
 
+  function cancelUpload(id: string) {
+    controllersRef.current.get(id)?.abort();
+  }
+
   async function uploadFiles(fileList: FileList | File[]) {
     const arr = Array.from(fileList);
     if (!arr.length) return;
     for (const file of arr) {
       const jobId = crypto.randomUUID();
+      const controller = new AbortController();
+      controllersRef.current.set(jobId, controller);
       setJobs((j) => [
         ...j,
         {
@@ -263,8 +287,9 @@ export default function DashboardClient() {
           status: "uploading",
         },
       ]);
+      let init: { file_id: string; upload_url: string } | undefined;
       try {
-        const init = await api.post<{ file_id: string; upload_url: string }>(
+        init = await api.post<{ file_id: string; upload_url: string }>(
           "/api/files/init-upload",
           {
             name: file.name,
@@ -273,12 +298,16 @@ export default function DashboardClient() {
             parent_id: currentFolderId,
           },
         );
-        await putWithProgress(init.upload_url, file, (pct, speedBps) =>
-          setJobs((j) =>
-            j.map((x) =>
-              x.id === jobId ? { ...x, progress: pct, speedBps } : x,
+        await putWithProgress(
+          init.upload_url,
+          file,
+          (pct, speedBps) =>
+            setJobs((j) =>
+              j.map((x) =>
+                x.id === jobId ? { ...x, progress: pct, speedBps } : x,
+              ),
             ),
-          ),
+          controller.signal,
         );
         await api.post("/api/files/complete-upload", { file_id: init.file_id });
         setJobs((j) =>
@@ -297,6 +326,17 @@ export default function DashboardClient() {
           ),
         );
         toast(`${file.name}: ${(e as ApiError).message}`, "error");
+        // Release reserved quota immediately instead of waiting for the
+        // abandoned-pending sweep — reserve_upload already charged storage
+        // before this upload started. This also runs on cancel, which is
+        // correct: the reservation must be released either way.
+        if (init?.file_id) {
+          api
+            .post("/api/files/abort-upload", { file_id: init.file_id })
+            .catch(() => {});
+        }
+      } finally {
+        controllersRef.current.delete(jobId);
       }
     }
     refresh();
@@ -593,6 +633,7 @@ export default function DashboardClient() {
       <UploadPanel
         jobs={jobs}
         onDismiss={(id) => setJobs((j) => j.filter((x) => x.id !== id))}
+        onCancel={cancelUpload}
         onClearDone={() => setJobs((j) => j.filter((x) => x.status !== "done"))}
       />
 
@@ -607,7 +648,11 @@ export default function DashboardClient() {
             <Button variant="ghost" onClick={() => setNewFolderOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleNewFolder} disabled={creatingFolder} loading={creatingFolder}>
+            <Button
+              onClick={handleNewFolder}
+              disabled={creatingFolder}
+              loading={creatingFolder}
+            >
               <Check className="h-4 w-4" /> Create
             </Button>
           </>
@@ -618,7 +663,9 @@ export default function DashboardClient() {
           value={newFolderName}
           onChange={(e) => setNewFolderName(e.target.value)}
           placeholder="Folder name"
-          onKeyDown={(e) => e.key === "Enter" && !creatingFolder && handleNewFolder()}
+          onKeyDown={(e) =>
+            e.key === "Enter" && !creatingFolder && handleNewFolder()
+          }
         />
       </Modal>
 

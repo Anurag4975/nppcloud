@@ -1,0 +1,142 @@
+diff --git a/app/(shell)/dashboard/DashboardClient.tsx b/app/(shell)/dashboard/DashboardClient.tsx
+--- a/app/(shell)/dashboard/DashboardClient.tsx
++++ b/app/(shell)/dashboard/DashboardClient.tsx
+@@ function putWithProgress(
+ function putWithProgress(
+   url: string,
+   file: File,
+   onProgress: (pct: number, speedBps: number) => void,
++  signal?: AbortSignal,
+ ): Promise<void> {
+   return new Promise((resolve, reject) => {
+     const xhr = new XMLHttpRequest();
+     // UploadJob previously had no speed field: onprogress only tracked
+     // percent, not bytes/time. Track loaded-bytes + timestamp deltas here so
+     // callers can show a live transfer speed alongside the progress bar.
+     let lastLoaded = 0;
+     let lastTime = performance.now();
+     xhr.upload.onprogress = (e) => {
+       if (!e.lengthComputable) return;
+       const now = performance.now();
+       const dt = (now - lastTime) / 1000;
+       const speedBps = dt > 0 ? (e.loaded - lastLoaded) / dt : 0;
+       lastLoaded = e.loaded;
+       lastTime = now;
+       onProgress(Math.round((e.loaded / e.total) * 100), speedBps);
+     };
+     xhr.onload = () =>
+       xhr.status >= 200 && xhr.status < 300
+         ? resolve()
+         : reject(new Error(`Upload failed (${xhr.status})`));
+     xhr.onerror = () => reject(new Error("Network error during upload"));
++    xhr.onabort = () => reject(new Error("Upload cancelled"));
++    signal?.addEventListener("abort", () => xhr.abort());
+     xhr.open("PUT", url);
+     xhr.setRequestHeader(
+       "Content-Type",
+       file.type || "application/octet-stream",
+     );
+     xhr.send(file);
+   });
+ }
+@@ export default function DashboardClient() {
+   const fileInputRef = useRef<HTMLInputElement>(null);
+   const [creatingFolder, setCreatingFolder] = useState(false);
++  const controllersRef = useRef<Map<string, AbortController>>(new Map());
+@@ async function uploadFiles(fileList: FileList | File[]) {
+   async function uploadFiles(fileList: FileList | File[]) {
+     const arr = Array.from(fileList);
+     if (!arr.length) return;
+     for (const file of arr) {
+       const jobId = crypto.randomUUID();
++      const controller = new AbortController();
++      controllersRef.current.set(jobId, controller);
+       setJobs((j) => [
+         ...j,
+         {
+           id: jobId,
+           name: file.name,
+           size: file.size,
+           progress: 0,
+           status: "uploading",
+         },
+       ]);
+       let init: { file_id: string; upload_url: string } | undefined;
+       try {
+         init = await api.post<{ file_id: string; upload_url: string }>(
+           "/api/files/init-upload",
+           {
+             name: file.name,
+             size: file.size,
+             mime_type: file.type,
+             parent_id: currentFolderId,
+           },
+         );
+         await putWithProgress(init.upload_url, file, (pct, speedBps) =>
+           setJobs((j) =>
+             j.map((x) =>
+               x.id === jobId ? { ...x, progress: pct, speedBps } : x,
+             ),
+           ),
++          controller.signal,
+         );
+         await api.post("/api/files/complete-upload", { file_id: init.file_id });
+         setJobs((j) =>
+           j.map((x) =>
+             x.id === jobId
+               ? { ...x, status: "done", progress: 100, speedBps: undefined }
+               : x,
+           ),
+         );
+       } catch (e) {
+         setJobs((j) =>
+           j.map((x) =>
+             x.id === jobId
+               ? { ...x, status: "error", error: (e as ApiError).message }
+               : x,
+           ),
+         );
+         toast(`${file.name}: ${(e as ApiError).message}`, "error");
++        if (init?.file_id) {
++          api.post("/api/files/abort-upload", { file_id: init.file_id }).catch(() => {});
++        }
++      } finally {
++        controllersRef.current.delete(jobId);
+       }
+     }
+     refresh();
+     window.dispatchEvent(new CustomEvent("nppcloud:usage-changed"));
+   }
++
++  function cancelUpload(id: string) {
++    controllersRef.current.get(id)?.abort();
++  }
+@@ <UploadPanel
+       <UploadPanel
+         jobs={jobs}
+         onDismiss={(id) => setJobs((j) => j.filter((x) => x.id !== id))}
++        onCancel={cancelUpload}
+         onClearDone={() => setJobs((j) => j.filter((x) => x.status !== "done"))}
+       />
+diff --git a/components/dashboard/UploadPanel.tsx b/components/dashboard/UploadPanel.tsx
+--- a/components/dashboard/UploadPanel.tsx
++++ b/components/dashboard/UploadPanel.tsx
+@@ interface UploadPanelProps {
+ interface UploadPanelProps {
+   jobs: UploadJob[];
+   onDismiss: (id: string) => void;
++  onCancel: (id: string) => void;
+   onClearDone: () => void;
+ }
+@@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) {
+-export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) {
++export function UploadPanel({ jobs, onDismiss, onCancel, onClearDone }: UploadPanelProps) {
+@@ <button onClick={() => onDismiss(j.id)}
+                 <button
+-                  onClick={() => onDismiss(j.id)}
++                  onClick={() => (j.status === "uploading" ? onCancel(j.id) : onDismiss(j.id))}
+                   aria-label="Dismiss"
+                   className="shrink-0 rounded p-1 text-ink-300 opacity-0 transition-all hover:bg-ink-100 hover:text-ink-600 group-hover:opacity-100"
+                 >
+                   <X className="h-3 w-3" />
+                 </button>

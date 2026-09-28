@@ -20,7 +20,10 @@ const bodySchema = z.object({ password: z.string().min(1).max(200) });
 // the link (and now the password) can redeem it. No CSRF guard: there's no
 // session/cookie being relied on here for authorization, only the link id
 // + password in the body itself.
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id } = await params;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest("Password required.");
@@ -32,10 +35,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (error) {
-    const message = ERROR_MESSAGES[error.message] ?? "This link is unavailable.";
+    const message =
+      ERROR_MESSAGES[error.message] ?? "This link is unavailable.";
     return Response.json({ error: message }, { status: 400 });
   }
 
-  const url = await getDownloadUrl(file.object_key, file.name);
+  // Same RETURNS TABLE(...) array-vs-object gotcha as app/s/[id]/route.ts.
+  // Unwrap before reading object_key/name or B2 will reject the presign.
+  const row = Array.isArray(file) ? file[0] : file;
+  if (!row) {
+    const message = ERROR_MESSAGES.file_not_found;
+    return Response.json({ error: message }, { status: 400 });
+  }
+
+  const url = await getDownloadUrl(row.object_key, row.name);
   return Response.json({ download_url: url });
 }

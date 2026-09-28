@@ -1,6 +1,13 @@
 "use client";
 import * as React from "react";
-import { ChevronDown, ChevronUp, X, CheckCircle2, AlertCircle, UploadCloud } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  UploadCloud,
+} from "lucide-react";
 import { Progress, cn, formatBytes } from "@/components/ui";
 
 export interface UploadJob {
@@ -31,6 +38,7 @@ export function formatSpeed(bps?: number): string {
 interface UploadPanelProps {
   jobs: UploadJob[];
   onDismiss: (id: string) => void;
+  onCancel: (id: string) => void;
   onClearDone: () => void;
 }
 
@@ -38,7 +46,12 @@ interface UploadPanelProps {
  * Collapsible upload panel pinned bottom-right. Progress bars animate via
  * transform scaleX (compositor-only). Auto-collapses when all jobs finish.
  */
-export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) {
+export function UploadPanel({
+  jobs,
+  onDismiss,
+  onCancel,
+  onClearDone,
+}: UploadPanelProps) {
   const [collapsed, setCollapsed] = React.useState(false);
   const active = jobs.filter((j) => j.status === "uploading").length;
   const done = jobs.filter((j) => j.status === "done").length;
@@ -61,7 +74,9 @@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) 
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-ink-800">
-              {active > 0 ? `Uploading ${active} file${active > 1 ? "s" : ""}…` : "Uploads complete"}
+              {active > 0
+                ? `Uploading ${active} file${active > 1 ? "s" : ""}…`
+                : "Uploads complete"}
             </p>
             <p className="text-[10px] text-ink-400">
               {done} done{failed > 0 ? ` · ${failed} failed` : ""}
@@ -80,7 +95,11 @@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) 
             aria-label={collapsed ? "Expand" : "Collapse"}
             className="rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
           >
-            {collapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            {collapsed ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
           </button>
         </div>
 
@@ -88,13 +107,16 @@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) 
         {!collapsed && (
           <div className="max-h-56 space-y-1 overflow-y-auto p-2">
             {jobs.map((j) => (
-              <div key={j.id} className="group flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-ink-50">
+              <div
+                key={j.id}
+                className="group flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-ink-50"
+              >
                 <span
                   className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
                     j.status === "done" && "bg-brand-50 text-brand-600",
                     j.status === "error" && "bg-red-50 text-red-600",
-                    j.status === "uploading" && "bg-ink-100 text-ink-500"
+                    j.status === "uploading" && "bg-ink-100 text-ink-500",
                   )}
                 >
                   {j.status === "done" ? (
@@ -106,7 +128,9 @@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) 
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-medium text-ink-700">{j.name}</p>
+                  <p className="truncate text-[11px] font-medium text-ink-700">
+                    {j.name}
+                  </p>
                   <div className="mt-1 flex items-center gap-2">
                     <Progress
                       value={j.progress}
@@ -115,17 +139,29 @@ export function UploadPanel({ jobs, onDismiss, onClearDone }: UploadPanelProps) 
                       animated={j.status === "uploading"}
                     />
                     <span className="w-10 shrink-0 text-right text-[10px] text-ink-400">
-                      {j.status === "done" ? "Done" : j.status === "error" ? "Failed" : `${j.progress}%`}
+                      {j.status === "done"
+                        ? "Done"
+                        : j.status === "error"
+                          ? "Failed"
+                          : `${j.progress}%`}
                     </span>
                   </div>
                   {j.status === "uploading" && j.speedBps !== undefined && (
-                    <p className="mt-0.5 text-[10px] text-ink-400">{formatSpeed(j.speedBps)}</p>
+                    <p className="mt-0.5 text-[10px] text-ink-400">
+                      {formatSpeed(j.speedBps)}
+                    </p>
                   )}
-                  {j.error && <p className="mt-0.5 text-[10px] text-red-500">{j.error}</p>}
+                  {j.error && (
+                    <p className="mt-0.5 text-[10px] text-red-500">{j.error}</p>
+                  )}
                 </div>
                 <button
-                  onClick={() => onDismiss(j.id)}
-                  aria-label="Dismiss"
+                  onClick={() =>
+                    j.status === "uploading" ? onCancel(j.id) : onDismiss(j.id)
+                  }
+                  aria-label={
+                    j.status === "uploading" ? "Cancel upload" : "Dismiss"
+                  }
                   className="shrink-0 rounded p-1 text-ink-300 opacity-0 transition-all hover:bg-ink-100 hover:text-ink-600 group-hover:opacity-100"
                 >
                   <X className="h-3 w-3" />
