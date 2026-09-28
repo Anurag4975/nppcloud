@@ -1,3 +1,4 @@
+import { csrfGuard } from "@/lib/csrf";
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { badRequest, internalError } from "@/lib/errors";
@@ -7,6 +8,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const csrf = csrfGuard(req);
+  if (csrf) return csrf;
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const { suspend, reason } = await req.json().catch(() => ({}));

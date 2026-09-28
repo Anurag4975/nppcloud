@@ -551,3 +551,110 @@ begin
   end loop;
 end
 $$;
+create or replace function public.restore_folder_recursive(p_user_id uuid, p_folder_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.folders
+     where id = p_folder_id and user_id = p_user_id
+  ) then
+    return;
+  end if;
+
+  -- if the parent is still trashed, restore this folder at root
+  update public.folders f set parent_id = null
+   where f.id = p_folder_id and f.user_id = p_user_id
+     and exists (select 1 from public.folders d
+                  where d.id = f.parent_id and d.trashed_at is not null);
+
+  with recursive tree as (
+    select id from public.folders where id = p_folder_id
+    union all
+    select f.id from public.folders f join tree t on f.parent_id = t.id
+     where f.user_id = p_user_id
+  )
+  update public.folders set trashed_at = null
+   where id in (select id from tree) and user_id = p_user_id;
+
+  with recursive tree as (
+    select id from public.folders where id = p_folder_id
+    union all
+    select f.id from public.folders f join tree t on f.parent_id = t.id
+     where f.user_id = p_user_id
+  )
+  update public.files set status = 'active', trashed_at = null
+   where parent_id in (select id from tree)
+     and user_id = p_user_id and status = 'trashed';
+end;
+$$;
+create or replace function public.restore_file(p_user_id uuid, p_file_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.files f
+     set status = 'active', trashed_at = null,
+         parent_id = case when exists (
+           select 1 from public.folders d
+            where d.id = f.parent_id and d.trashed_at is not null
+         ) then null else f.parent_id end
+   where f.id = p_file_id and f.user_id = p_user_id and f.status = 'trashed';
+end;
+$$;
+create or replace function public.purge_folder_recursive(p_user_id uuid, p_folder_id uuid)
+returns text[]
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ids uuid[];
+  v_total bigint;
+  v_keys text[];
+  v_household_id uuid;
+begin
+  if not exists (
+    select 1 from folders
+     where id = p_folder_id and user_id = p_user_id and trashed_at is not null
+  ) then
+    return '{}';
+  end if;
+
+  with recursive tree as (
+    select id from folders where id = p_folder_id
+    union all
+    select f.id from folders f join tree t on f.parent_id = t.id
+     where f.user_id = p_user_id
+  )
+  select array_agg(id) into v_ids from tree;
+
+  with del as (
+    delete from files
+     where user_id = p_user_id and parent_id = any(v_ids)
+    returning object_key, size_bytes
+  )
+  select coalesce(sum(size_bytes), 0), coalesce(array_agg(object_key), '{}')
+    into v_total, v_keys from del;
+
+  delete from folders where id = any(v_ids) and user_id = p_user_id;
+
+  if v_total > 0 then
+    select household_id into v_household_id
+      from household_members where user_id = p_user_id;
+    if v_household_id is not null then
+      update households set stored_bytes = greatest(stored_bytes - v_total, 0)
+       where id = v_household_id;
+    end if;
+    update usage set stored_bytes = greatest(stored_bytes - v_total, 0), updated_at = now()
+     where user_id = p_user_id;
+  end if;
+
+  return v_keys;
+end;
+$$;
