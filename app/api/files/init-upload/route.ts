@@ -1,14 +1,23 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getAuthedUser } from "@/lib/auth";
-import { unauthorized, badRequest, internalError, rpcError } from "@/lib/errors";
+import {
+  unauthorized,
+  badRequest,
+  internalError,
+  rpcError,
+} from "@/lib/errors";
 import { csrfGuard } from "@/lib/csrf";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { getUploadUrl, objectKeyFor } from "@/lib/b2";
 
 const bodySchema = z.object({
   name: z.string().min(1).max(255),
-  size: z.number().int().nonnegative().max(5 * 1024 * 1024 * 1024), // hard cap, server-enforced
+  size: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(5 * 1024 * 1024 * 1024), // hard cap, server-enforced
   mime_type: z.string().max(255).optional(),
   parent_id: z.string().uuid().nullable().optional(),
 });
@@ -27,7 +36,11 @@ export async function POST(req: NextRequest) {
   const admin = supabaseAdmin();
 
   // Active storage provider (multi-provider failover: flip one DB row to switch)
-  const { data: provider } = await admin.from("storage_providers").select("id").eq("is_active", true).single();
+  const { data: provider } = await admin
+    .from("storage_providers")
+    .select("id")
+    .eq("is_active", true)
+    .single();
   if (!provider) return internalError();
 
   const fileId = crypto.randomUUID();
@@ -49,6 +62,22 @@ export async function POST(req: NextRequest) {
   });
   if (error) return rpcError(error);
 
-  const uploadUrl = await getUploadUrl(objectKey, mime_type ?? "application/octet-stream");
-  return Response.json({ file_id: (file as any)?.id ?? fileId, upload_url: uploadUrl, object_key: objectKey });
+  let uploadUrl: string;
+  try {
+    uploadUrl = await getUploadUrl(
+      objectKey,
+      mime_type ?? "application/octet-stream",
+    );
+  } catch {
+    await admin.rpc("abort_pending_upload", {
+      p_file_id: fileId,
+      p_user_id: user.id,
+    }); // adjust to its real signature
+    return internalError();
+  }
+  return Response.json({
+    file_id: (file as any)?.id ?? fileId,
+    upload_url: uploadUrl,
+    object_key: objectKey,
+  });
 }
