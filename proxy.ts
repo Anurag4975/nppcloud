@@ -4,15 +4,15 @@ import { NextResponse, type NextRequest } from "next/server";
 function buildCsp(nonce: string, isDev: boolean) {
   return [
     "default-src 'self'",
-    "img-src 'self' data: blob: https://*.backblazeb2.com https://s3.*.backblazeb2.com",
-    "media-src 'self' https://*.backblazeb2.com https://s3.*.backblazeb2.com",
+    "img-src 'self' data: blob: https://*.backblazeb2.com",
+    "media-src 'self' https://*.backblazeb2.com",
     "style-src 'self' 'unsafe-inline'", // Tailwind + Next inject inline styles
     // 'strict-dynamic' lets Next's bootstrapped scripts load further chunks
     // without each one needing its own nonce. 'unsafe-eval' is dev-only
     // (React's eval-based error stacks); production drops it.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
-    "connect-src 'self' https://*.supabase.co https://*.backblazeb2.com https://s3.*.backblazeb2.com",
-    "frame-src 'self' https://view.officeapps.live.com https://*.backblazeb2.com https://s3.*.backblazeb2.com",
+    "connect-src 'self' https://*.supabase.co https://*.backblazeb2.com",
+    "frame-src 'self' https://view.officeapps.live.com https://*.backblazeb2.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
