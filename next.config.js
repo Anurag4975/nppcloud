@@ -7,19 +7,9 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
   },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "img-src 'self' data: blob:",
-      "style-src 'self' 'unsafe-inline'", // Tailwind injects inline styles
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js dev/HMR; tighten in prod build
-      "connect-src 'self' https://*.supabase.co https://*.backblazeb2.com https://s3.*.backblazeb2.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
-  },
+  // NOTE: Content-Security-Policy is set per-request in proxy.ts so it can
+  // carry a per-request nonce. Do not set it here — two CSP headers would be
+  // enforced as their intersection.
 ];
 
 const nextConfig = {

@@ -23,6 +23,7 @@ import {
   Star,
   Info,
   ArrowRightLeft,
+  Eye,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import {
@@ -53,6 +54,7 @@ import {
   type DetailsItem,
 } from "@/components/dashboard/DetailsPanel";
 import { MoveToPicker } from "@/components/dashboard/MoveToPicker";
+import { PreviewModal } from "@/components/dashboard/PreviewModal";
 
 type Crumb = { id: string | null; name: string };
 
@@ -155,6 +157,7 @@ export default function DashboardClient() {
     id: string;
     name: string;
   } | null>(null);
+  const [previewFile, setPreviewFile] = useState<FileRow | null>(null);
 
   // One AbortController per in-flight upload job, keyed by jobId. The cancel
   // button reaches into this map to abort the matching XHR. Entries are
@@ -444,6 +447,7 @@ export default function DashboardClient() {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, item, kind });
   }
+
   async function handleMove(parentId: string | null) {
     if (!moveTarget) return;
     try {
@@ -459,6 +463,10 @@ export default function DashboardClient() {
     }
   }
 
+  function handlePreview(file: FileRow) {
+    setPreviewFile(file);
+  }
+
   async function handleDuplicate(file: FileRow) {
     try {
       await api.post(`/api/files/${file.id}/copy`, {});
@@ -469,6 +477,7 @@ export default function DashboardClient() {
       toast((e as ApiError).message, "error");
     }
   }
+
   async function handleShare(file: FileRow) {
     try {
       const { link, share_url } = await api.post<{
@@ -516,7 +525,6 @@ export default function DashboardClient() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      {/* Breadcrumbs */}
       {/* Breadcrumbs or Starred header */}
       {showStarred ? (
         <h1 className="flex items-center gap-2 text-lg font-bold text-ink-900">
@@ -661,10 +669,11 @@ export default function DashboardClient() {
                 kind="file"
                 item={f}
                 index={i + visibleFolders.length}
-                onOpen={() => handleDownload(f.id)}
+                onOpen={() => handlePreview(f)}
                 onContextMenu={(e) => openContextMenu(e, f, "file")}
                 onMove={(id, kind, name) => setMoveTarget({ id, kind, name })}
                 onDuplicate={handleDuplicate}
+                onPreview={handlePreview}
                 onDownload={handleDownload}
                 onShare={handleShare}
                 onRename={(id, kind, name) => {
@@ -703,10 +712,11 @@ export default function DashboardClient() {
                 kind="file"
                 item={f}
                 index={i + visibleFolders.length}
-                onOpen={() => handleDownload(f.id)}
+                onOpen={() => handlePreview(f)}
                 onContextMenu={(e) => openContextMenu(e, f, "file")}
                 onMove={(id, kind, name) => setMoveTarget({ id, kind, name })}
                 onDuplicate={handleDuplicate}
+                onPreview={handlePreview}
                 onDownload={handleDownload}
                 onShare={handleShare}
                 onRename={(id, kind, name) => {
@@ -874,6 +884,15 @@ export default function DashboardClient() {
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           items={[
+            ...(contextMenu.kind === "file"
+              ? [
+                  {
+                    label: "Preview",
+                    icon: <Eye className="h-3.5 w-3.5" />,
+                    onClick: () => handlePreview(contextMenu.item as FileRow),
+                  },
+                ]
+              : []),
             {
               label: "Open",
               icon: <FolderOpen className="h-3.5 w-3.5" />,
@@ -971,6 +990,14 @@ export default function DashboardClient() {
         onClose={() => setMoveTarget(null)}
         onMove={handleMove}
       />
+
+      {/* Preview modal */}
+      <PreviewModal
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onDownload={handleDownload}
+      />
+
       {/* Details sidebar */}
       {detailsItem && (
         <DetailsPanel

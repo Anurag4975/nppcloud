@@ -9,6 +9,7 @@ import {
   Star,
   ArrowRightLeft,
   Copy as CopyIcon,
+  Eye,
 } from "lucide-react";
 import {
   FileTypeIcon,
@@ -34,6 +35,7 @@ interface FileListItemProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   onMove?: (id: string, kind: "file" | "folder", name: string) => void;
   onDuplicate?: (file: FileRow) => void;
+  onPreview?: (file: FileRow) => void;
 }
 
 export const FileListItem = React.memo(function FileListItem({
@@ -48,6 +50,7 @@ export const FileListItem = React.memo(function FileListItem({
   onContextMenu,
   onMove,
   onDuplicate,
+  onPreview,
 }: FileListItemProps) {
   const isFolder = kind === "folder";
   const name = item.name;
@@ -74,6 +77,11 @@ export const FileListItem = React.memo(function FileListItem({
         },
       ]
     : [
+        {
+          label: "Preview",
+          icon: <Eye className="h-3.5 w-3.5" />,
+          onClick: () => onPreview?.(item as FileRow),
+        },
         {
           label: "Download",
           icon: <Download className="h-3.5 w-3.5" />,
@@ -191,6 +199,7 @@ export const FileGridCard = React.memo(function FileGridCard({
   onContextMenu,
   onMove,
   onDuplicate,
+  onPreview,
 }: FileGridCardProps) {
   const isFolder = kind === "folder";
   const name = item.name;
@@ -216,6 +225,11 @@ export const FileGridCard = React.memo(function FileGridCard({
         },
       ]
     : [
+        {
+          label: "Preview",
+          icon: <Eye className="h-3.5 w-3.5" />,
+          onClick: () => onPreview?.(item as FileRow),
+        },
         {
           label: "Download",
           icon: <Download className="h-3.5 w-3.5" />,

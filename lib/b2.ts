@@ -95,3 +95,15 @@ export async function copyObject(
     }),
   );
 }
+
+const PREVIEW_TTL_SECONDS = 60 * 60; // 1 hour — long videos/PPTs won't expire mid-view
+/** Inline (not attachment) signed URL for preview. No Content-Disposition=attachment. */
+export async function getInlineUrl(objectKey: string, contentType?: string) {
+  const cmd = new GetObjectCommand({
+    Bucket: process.env.B2_BUCKET!,
+    Key: objectKey,
+    ResponseContentDisposition: "inline",
+    ResponseContentType: contentType,
+  });
+  return getSignedUrl(client(), cmd, { expiresIn: PREVIEW_TTL_SECONDS });
+}
